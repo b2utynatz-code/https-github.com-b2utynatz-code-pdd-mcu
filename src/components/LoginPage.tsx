@@ -57,14 +57,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         {/* Institutional Emblem & Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-linear-to-br from-pink-800 to-pink-950 border border-pink-700/50 shadow-xl shadow-pink-950/40">
-            <ShieldCheck className="w-10 h-10 text-amber-400" />
+          <div className="inline-flex items-center justify-center p-3 sm:p-4 rounded-3xl bg-white/95 backdrop-blur-md border-2 border-amber-400/50 shadow-2xl shadow-pink-950/60 group">
+            <img 
+              src="/mcu-logo.png" 
+              alt="ตราสัญลักษณ์ มหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย (มจร)" 
+              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+              referrerPolicy="no-referrer"
+            />
           </div>
 
           <div>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/10 text-amber-300 border border-amber-400/20 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>หน่วยตรวจสอบภายใน มจร</span>
+              <span>  สำนักงานตรวจสอบภายใน มจร</span>
             </span>
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">
               ระบบสารสนเทศผู้ปฏิบัติงานด้านการเงิน บัญชี พัสดุ และงบประมาณ
@@ -178,7 +183,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         {/* Security Footer Notice */}
         <div className="mt-6 text-center space-y-2">
           <p className="text-[11px] text-pink-200/70 leading-relaxed max-w-sm mx-auto">
-            ระบบสารสนเทศนี้จำกัดการเข้าถึงเฉพาะเจ้าหน้าที่หน่วยตรวจสอบภายใน มหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย (มจร)
+            ระบบสารสนเทศนี้จำกัดการเข้าถึงเฉพาะเจ้าหน้าที่สำนักงานตรวจสอบภายใน มหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย (มจร)
           </p>
           <div className="text-[10px] text-pink-300/40">
             MCU Internal Audit Information System

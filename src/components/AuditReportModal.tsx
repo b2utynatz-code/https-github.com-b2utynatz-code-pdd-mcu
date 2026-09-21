@@ -1,6 +1,6 @@
 import React from 'react';
 import { Personnel } from '../types';
-import { X, Printer, ShieldCheck, Download, AlertTriangle, CheckCircle2, GraduationCap } from 'lucide-react';
+import { X, Printer, ShieldCheck, Download, AlertTriangle, CheckCircle2, GraduationCap, ClipboardList } from 'lucide-react';
 import { calculateTenure, formatThaiDate } from '../utils/helpers';
 import { calculateAlignmentSummary } from '../utils/educationAlignment';
 
@@ -8,12 +8,14 @@ interface AuditReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   personnelList: Personnel[];
+  onOpenWorkingPaper?: () => void;
 }
 
 export const AuditReportModal: React.FC<AuditReportModalProps> = ({
   isOpen,
   onClose,
   personnelList,
+  onOpenWorkingPaper,
 }) => {
   if (!isOpen) return null;
 
@@ -51,6 +53,20 @@ export const AuditReportModal: React.FC<AuditReportModalProps> = ({
             <span>รายงานผลการตรวจสอบอัตรากำลังและการปฏิบัติงาน (Internal Audit Report)</span>
           </div>
           <div className="flex items-center gap-2">
+            {onOpenWorkingPaper && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenWorkingPaper();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-pink-300 text-xs font-medium transition cursor-pointer border border-slate-700"
+                title="เปิดดูกระดาษทำการตรวจสอบภายใน (Audit Working Paper)"
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">กระดาษทำการ (WP)</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handlePrint}

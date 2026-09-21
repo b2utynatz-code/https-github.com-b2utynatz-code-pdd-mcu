@@ -16,11 +16,12 @@ import { ImportExportModal } from './components/ImportExportModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { MultiDutyModal } from './components/MultiDutyModal';
 import { EducationAlignmentModal } from './components/EducationAlignmentModal';
+import { AuditWorkingPaperView } from './components/AuditWorkingPaperView';
 import { calculateTenure } from './utils/helpers';
 import { evaluatePersonnelAlignment } from './utils/educationAlignment';
 import { Users, AlertCircle, Plus, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, Upload } from 'lucide-react';
 
-const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v2';
+const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v3';
 const AUTH_STORAGE_KEY = 'mcu_audit_current_user_v1';
 
 export default function App() {
@@ -65,7 +66,7 @@ export default function App() {
   }, [personnelList]);
 
   // Active top navigation tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'directory' | 'matrix'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'directory' | 'matrix' | 'working-paper'>('dashboard');
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -101,12 +102,14 @@ export default function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam === 'directory' || tabParam === 'matrix' || tabParam === 'dashboard') {
+      if (tabParam === 'directory' || tabParam === 'matrix' || tabParam === 'dashboard' || tabParam === 'working-paper') {
         setActiveTab(tabParam);
       }
 
       const viewParam = params.get('view');
-      if (viewParam === 'report') {
+      if (viewParam === 'working-paper' || viewParam === 'wp') {
+        setActiveTab('working-paper');
+      } else if (viewParam === 'report') {
         setIsReportModalOpen(true);
       } else if (viewParam === 'alignment') {
         setIsAlignmentModalOpen(true);
@@ -325,6 +328,7 @@ export default function App() {
         onOpenReportModal={() => setIsReportModalOpen(true)}
         onOpenImportExportModal={() => setIsImportExportModalOpen(true)}
         onClearAllData={personnelList.length > 0 ? handleClearAllPersonnel : undefined}
+        onReloadSurveyData={handleResetToDefault}
         totalPersonnel={personnelList.length}
         totalDepartments={departments.length}
       />
@@ -467,6 +471,7 @@ export default function App() {
                   }}
                   onNavigateToDirectory={() => setActiveTab('directory')}
                   onNavigateToMatrix={() => setActiveTab('matrix')}
+                  onNavigateToWorkingPaper={() => setActiveTab('working-paper')}
                 />
 
                 {/* Quick Preview of Recent Personnel */}
@@ -618,6 +623,14 @@ export default function App() {
             onSelectPersonnel={setSelectedPersonForDetail}
           />
         )}
+
+        {/* Tab 4: Audit Working Paper (WP-HR-01/2569) */}
+        {activeTab === 'working-paper' && (
+          <AuditWorkingPaperView
+            personnelList={personnelList}
+            onSelectPerson={setSelectedPersonForDetail}
+          />
+        )}
       </main>
 
       {/* University Footer */}
@@ -660,6 +673,7 @@ export default function App() {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         personnelList={personnelList}
+        onOpenWorkingPaper={() => setActiveTab('working-paper')}
       />
 
       <ImportExportModal

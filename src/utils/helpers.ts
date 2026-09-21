@@ -51,7 +51,7 @@ export function calculateTenure(startDateStr: string): { years: number; months: 
       months += 12;
     }
 
-    if (years < 0) return { years: 0, months: 0, text: 'เพิ่งเริ่มปฏิบัติงาน' };
+    if (years < 0) return { years: 0, months: 0, text: 'น้อยกว่า 1 เดือน' };
 
     let text = '';
     if (years > 0 && months > 0) {

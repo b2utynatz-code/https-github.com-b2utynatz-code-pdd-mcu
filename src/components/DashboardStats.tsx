@@ -11,7 +11,8 @@ import {
   Clock,
   ArrowRight,
   ShieldAlert,
-  Users
+  Users,
+  ClipboardList
 } from 'lucide-react';
 import { calculateTenure } from '../utils/helpers';
 import { CategoryPieChart } from './CategoryPieChart';
@@ -27,6 +28,7 @@ interface DashboardStatsProps {
   onFilterNonAligned?: () => void;
   onNavigateToDirectory: () => void;
   onNavigateToMatrix: () => void;
+  onNavigateToWorkingPaper?: () => void;
 }
 
 export const DashboardStats: React.FC<DashboardStatsProps> = ({
@@ -39,6 +41,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
   onFilterNonAligned,
   onNavigateToDirectory,
   onNavigateToMatrix,
+  onNavigateToWorkingPaper,
 }) => {
   const total = personnelList.length;
 
@@ -116,6 +119,44 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
           </button>
         </div>
       )}
+
+      {/* Audit Working Paper Callout Banner */}
+      <div 
+        id="working-paper-banner"
+        className="bg-slate-900 text-white rounded-xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm border border-slate-800"
+      >
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 rounded-xl bg-pink-600/30 border border-pink-400/40 text-pink-300 shrink-0 mt-0.5">
+            <ClipboardList className="w-5 h-5 text-pink-300" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-pink-600 text-white text-[11px] font-bold">
+                เอกสารทางการ
+              </span>
+              <span className="text-xs font-mono text-slate-300">
+                WP-HR-01/2569
+              </span>
+              <h3 className="text-sm font-semibold text-white">
+                รายงานกระดาษทำการ (Audit Working Paper) ตาราง 8 คอลัมน์
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 font-body leading-relaxed">
+              ตารางวิเคราะห์ความเสี่ยงด้านการควบคุมภายในและ HR Audit ครบ {total} รายการ พร้อมข้อเสนอแนะ 4 ด้าน และส่งออกเป็น CSV / Excel ได้ทันที
+            </p>
+          </div>
+        </div>
+        {onNavigateToWorkingPaper && (
+          <button
+            type="button"
+            onClick={onNavigateToWorkingPaper}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition shrink-0 shadow-xs cursor-pointer"
+          >
+            <span>เปิดกระดาษทำการ (WP)</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
       {/* 4 Core Duty Cards */}
       <div>

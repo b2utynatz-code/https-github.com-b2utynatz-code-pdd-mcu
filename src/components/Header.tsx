@@ -11,20 +11,23 @@ import {
   Sparkles,
   Trash2,
   LogOut,
-  UserCheck
+  UserCheck,
+  ClipboardList,
+  RotateCcw
 } from 'lucide-react';
 import { AuthUser } from '../types';
 
 interface HeaderProps {
   currentUser?: AuthUser | null;
   onLogout?: () => void;
-  activeTab: 'dashboard' | 'directory' | 'matrix';
-  setActiveTab: (tab: 'dashboard' | 'directory' | 'matrix') => void;
+  activeTab: 'dashboard' | 'directory' | 'matrix' | 'working-paper';
+  setActiveTab: (tab: 'dashboard' | 'directory' | 'matrix' | 'working-paper') => void;
   onOpenAddModal: () => void;
   onOpenReportModal: () => void;
   onOpenImportExportModal: () => void;
   onOpenStarterModal?: () => void;
   onClearAllData?: () => void;
+  onReloadSurveyData?: () => void;
   totalPersonnel: number;
   totalDepartments: number;
 }
@@ -38,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenReportModal,
   onOpenImportExportModal,
   onClearAllData,
+  onReloadSurveyData,
   totalPersonnel,
   totalDepartments,
 }) => {
@@ -143,6 +147,22 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              id="btn-header-working-paper"
+              type="button"
+              onClick={() => setActiveTab('working-paper')}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition border cursor-pointer ${
+                activeTab === 'working-paper'
+                  ? 'bg-pink-700 text-white border-pink-700 shadow-xs'
+                  : 'bg-slate-100 hover:bg-pink-50 hover:text-pink-900 hover:border-pink-200 text-slate-700 border-slate-200'
+              }`}
+              title="เปิดดูรายงานกระดาษทำการตรวจสอบภายใน (Audit Working Paper)"
+            >
+              <ClipboardList className={`w-4 h-4 ${activeTab === 'working-paper' ? 'text-white' : 'text-pink-700'}`} />
+              <span className="hidden sm:inline">กระดาษทำการ (WP)</span>
+              <span className="sm:hidden">WP</span>
+            </button>
+
+            <button
               id="btn-audit-report"
               type="button"
               onClick={onOpenReportModal}
@@ -166,6 +186,19 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="sm:hidden">CSV</span>
             </button>
 
+            {onReloadSurveyData && totalPersonnel === 0 && (
+              <button
+                id="btn-header-reload-data"
+                type="button"
+                onClick={onReloadSurveyData}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-sm font-medium transition cursor-pointer shadow-xs"
+                title="โหลดชุดข้อมูลสำรวจบุคลากร มจร ประจำปี 2569 (191 ท่าน)"
+              >
+                <RotateCcw className="w-4 h-4 text-white" />
+                <span>โหลดข้อมูลสำรวจ มจร (191 ท่าน)</span>
+              </button>
+            )}
+
             {onClearAllData && totalPersonnel > 0 && (
               <button
                 id="btn-header-clear-data"
@@ -182,9 +215,9 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs between Dashboard, Directory, and Duty Matrix */}
+        {/* Navigation Tabs between Dashboard, Directory, Duty Matrix, and Audit Working Paper */}
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-          <nav className="flex items-center space-x-1" aria-label="Tabs">
+          <nav className="flex items-center space-x-1 flex-wrap gap-y-1.5" aria-label="Tabs">
             <button
               id="tab-dashboard"
               type="button"
@@ -230,6 +263,25 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Grid3X3 className={`w-4 h-4 ${activeTab === 'matrix' ? 'text-pink-700' : 'text-slate-500'}`} />
               <span>เมทริกซ์แบ่งแยกหน้าที่ (SoD)</span>
+            </button>
+
+            <button
+              id="tab-working-paper"
+              type="button"
+              onClick={() => setActiveTab('working-paper')}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                activeTab === 'working-paper'
+                  ? 'bg-pink-50 text-pink-900 border border-pink-200 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <ClipboardList className={`w-4 h-4 ${activeTab === 'working-paper' ? 'text-pink-700' : 'text-slate-500'}`} />
+              <span>กระดาษทำการ (Working Paper)</span>
+              <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'working-paper' ? 'bg-pink-200 text-pink-900' : 'bg-pink-100 text-pink-800'
+              }`}>
+                WP-HR-01
+              </span>
             </button>
           </nav>
 

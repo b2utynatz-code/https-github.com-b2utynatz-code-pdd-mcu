@@ -8,6 +8,19 @@ export type SubunitCategory =
   | 'วิทยาเขต / วิทยาลัยสงฆ์'
   | 'สถาบัน / สำนัก';
 
+export interface TrainingRecord {
+  id: string;
+  courseName: string; // ชื่อหลักสูตร / หัวข้อการอบรม
+  organizer: string; // หน่วยงานผู้จัดฝึกอบรม เช่น สำนักงานตรวจสอบภายใน มจร, กรมบัญชีกลาง, สตง.
+  trainingDate: string; // วันที่เข้ารับการอบรม (YYYY-MM-DD หรือ พ.ศ.)
+  hours: number; // จำนวนชั่วโมงอบรม
+  category: 'การเงิน' | 'บัญชี' | 'พัสดุ' | 'งบประมาณ' | 'การควบคุมภายในและการบริหารความเสี่ยง' | 'ระบบสารสนเทศและดิจิทัล' | 'อื่นๆ';
+  riskMitigationImpact: string; // ผลลัพธ์การลดความเสี่ยงที่จะเกิดขึ้นในอนาคตและการพัฒนาบุคลากร
+  status: 'ผ่านการอบรมแล้ว' | 'มีวุฒิบัตร/ผ่านเกณฑ์' | 'กำลังเข้ารับการอบรม' | 'แผนพัฒนาบุคลากร';
+  certificateNo?: string; // เลขที่วุฒิบัตร หรือเลขที่หนังสือรับรอง
+  notes?: string; // หมายเหตุเพิ่มเติม
+}
+
 export interface Personnel {
   id: string;
   // 1. ส่วนงาน
@@ -46,6 +59,7 @@ export interface Personnel {
 
   // Audit-specific metadata for internal auditing transparency
   isCertifiedProcurement?: boolean; // ผ่านการอบรม พ.ร.บ. จัดซื้อจัดจ้าง 2560 หรือไม่
+  trainings?: TrainingRecord[]; // ข้อมูลการเข้ารับการอบรมและพัฒนาบุคลากร เพื่อพัฒนาและลดความเสี่ยงในอนาคต
   auditStatus?: 'ปกติ' | 'ควรติดตาม' | 'ต้องการบุคลากรเพิ่ม';
   auditNotes?: string;
   avatarUrl?: string;

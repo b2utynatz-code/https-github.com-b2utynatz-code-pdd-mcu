@@ -49,10 +49,21 @@ export function generateWorkingPaperRows(personnelList: Personnel[]): WorkingPap
     const educationText = `${person.educationLevel} (${person.major || 'ไม่ระบุสาขา'})`;
 
     // การอบรมเพิ่มเติมที่เกี่ยวข้อง
-    const hasTraining = Boolean(person.isCertifiedProcurement);
-    const trainingText = hasTraining
-      ? 'ผ่านการอบรม พ.ร.บ. การจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 (มี Certificate กรมบัญชีกลาง)'
-      : 'ไม่มีข้อมูลการเข้ารับการอบรม';
+    const personTrainings = person.trainings || [];
+    const hasAddedTrainings = personTrainings.length > 0;
+    const hasCertified = Boolean(person.isCertifiedProcurement);
+    const hasTraining = hasCertified || hasAddedTrainings;
+
+    let trainingText = 'ไม่มีข้อมูลการเข้ารับการอบรม';
+    if (hasAddedTrainings) {
+      const summaryList = personTrainings.map(t => `${t.courseName} (${t.hours || 0} ชม.)`);
+      trainingText = `ผ่านการอบรม ${personTrainings.length} หลักสูตร: ${summaryList.join('; ')}`;
+      if (hasCertified && !summaryList.some(s => s.includes('พ.ร.บ.') || s.includes('จัดซื้อจัดจ้าง'))) {
+        trainingText += ' [Certificate พ.ร.บ. จัดซื้อจัดจ้างฯ 2560]';
+      }
+    } else if (hasCertified) {
+      trainingText = 'ผ่านการอบรม พ.ร.บ. การจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 (มี Certificate กรมบัญชีกลาง)';
+    }
 
     // การประเมินความสอดคล้องของวุฒิ
     const alignment = evaluatePersonnelAlignment(person);
@@ -72,6 +83,20 @@ export function generateWorkingPaperRows(personnelList: Personnel[]): WorkingPap
 
     const isSodConflict = hasCashInOutConflict || hasTotalSodConflict || hasProcurementAndFinanceConflict;
 
+    // การตรวจสอบหลักสูตรอบรมที่ช่วยลดความเสี่ยง (Risk Mitigation Checks)
+    const hasInternalControlTraining = personTrainings.some(t => 
+      t.category === 'การควบคุมภายในและการบริหารความเสี่ยง' || 
+      /ควบคุมภายใน|ความเสี่ยง|sod|csa|ธรรมาภิบาล/i.test(t.courseName)
+    );
+    const hasFinanceAccountingTraining = personTrainings.some(t => 
+      t.category === 'การเงิน' || t.category === 'บัญชี' ||
+      /การเงิน|บัญชี|gfmis|งบการเงิน/i.test(t.courseName)
+    );
+    const hasProcurementTraining = hasCertified || personTrainings.some(t => 
+      t.category === 'พัสดุ' || 
+      /พัสดุ|จัดซื้อจัดจ้าง|e-gp|พ.ร.บ./i.test(t.courseName)
+    );
+
     // การวิเคราะห์และข้อเสนอแนะของผู้ตรวจสอบภายใน (Audit Remarks)
     let riskLevel: 'วิกฤต' | 'สูง' | 'ปานกลาง' | 'ปกติ' = 'ปกติ';
     let riskScore = 1;
@@ -79,22 +104,60 @@ export function generateWorkingPaperRows(personnelList: Personnel[]): WorkingPap
     let recommendedCourse = '';
 
     if (hasTraining) {
-      // กรณีมีข้อมูลการอบรม: ระบุว่าความรู้ความสามารถสอดคล้องกับหน้าที่หรือไม่ หรือควรต่อยอดทักษะด้านใด
-      if (hasSupplies && primaryDuties.length === 1) {
+      // กรณีมีข้อมูลการอบรม: ตรวจสอบผลลัพธ์ในการชดเชยและลดความเสี่ยง (Risk Mitigation Impact)
+      if (hasTotalSodConflict) {
+        if (hasInternalControlTraining) {
+          riskLevel = 'ปานกลาง';
+          riskScore = 2.4;
+          recommendedCourse = 'หลักสูตรการประเมินการควบคุมด้วยตนเองขั้นสูง (Advanced CSA) และการสอบทานข้ามสายงาน';
+          remarks = `[ความเสี่ยงลดลงจากการพัฒนาบุคลากร] ปฏิบัติหน้าที่ควบหลายด้าน แต่ผ่านการอบรมด้านการควบคุมภายใน/บริหารความเสี่ยงแล้ว ช่วยลดความเสี่ยงและชดเชยการแบ่งแยกหน้าที่ (Compensating Control) ควรต่อยอดทักษะด้าน "${recommendedCourse}"`;
+        } else {
+          riskLevel = 'สูง';
+          riskScore = 3.2;
+          recommendedCourse = 'หลักสูตรการควบคุมภายในและการประเมินความเสี่ยง (CSA) และการแบ่งแยกหน้าที่ (SoD)';
+          remarks = `[ผ่านการอบรมบางส่วน - มีความเสี่ยง SoD ควบหลายด้าน] มีประวัติการอบรมในระบบ แต่ยังขาดการอบรมด้านการควบคุมภายในเพื่อชดเชยการควบหน้าที่ ${primaryDutiesText} แนะนำให้อบรมด่วน: "${recommendedCourse}"`;
+        }
+      } else if (hasCashInOutConflict) {
+        if (hasInternalControlTraining || hasFinanceAccountingTraining) {
+          riskLevel = 'ปานกลาง';
+          riskScore = 2.2;
+          recommendedCourse = 'หลักสูตรการควบคุมเงินสดในมือและการกระทบยอดเงินฝากธนาคารแบบอัตโนมัติ';
+          remarks = `[ความเสี่ยงลดลงจากการอบรม] ปฏิบัติหน้าที่รับ-จ่ายเงินร่วมกัน แต่ผ่านการอบรมเสริมทักษะการเงิน/การควบคุมภายในแล้ว ช่วยลดความผิดพลาดในการเบิกจ่าย แนะนำให้ต่อยอด: "${recommendedCourse}"`;
+        } else {
+          riskLevel = 'สูง';
+          riskScore = 3.3;
+          recommendedCourse = 'หลักสูตรระเบียบการเงินการคลัง มจร การควบคุมเงินสดในมือ และการแบ่งแยกหน้าที่เพื่อป้องกันข้อผิดพลาด';
+          remarks = `[ความเสี่ยงสูง - ขัดหลักการ SoD รับคู่จ่าย] แม้มีข้อมูลการอบรม แต่ยังขาดหลักสูตรการควบคุมเงินสดในมือโดยตรง ควรส่งเข้ารับการอบรม: "${recommendedCourse}"`;
+        }
+      } else if (isNewStaff && alignment.level === 'non_aligned') {
+        if ((hasSupplies && hasProcurementTraining) || ((hasFinance || hasAccounting) && hasFinanceAccountingTraining)) {
+          riskLevel = 'ปกติ';
+          riskScore = 1.3;
+          recommendedCourse = 'หลักสูตรการเพิ่มประสิทธิภาพการบริหารสัญญาและการรายงานงบการเงินเชิงวิเคราะห์';
+          remarks = `[ลดความเสี่ยงสำเร็จ - วุฒิไม่ตรงสายแต่ผ่านการอบรมตรงภาระงาน] บุคลากรบรรจุใหม่ (${tenureText}) และวุฒิเดิมไม่ตรงสาย แต่ได้ผ่านการอบรมเสริมทักษะเฉพาะทาง มีความพร้อมในการปฏิบัติหน้าที่ แนะนำส่งเสริมต่อยอดด้าน "${recommendedCourse}"`;
+        } else {
+          riskLevel = 'ปานกลาง';
+          riskScore = 2.3;
+          recommendedCourse = hasSupplies ? 'หลักสูตร พ.ร.บ. การจัดซื้อจัดจ้างฯ 2560 และระบบ e-GP' : 'หลักสูตรมาตรฐานการบัญชีภาครัฐและการรายงานทางการเงิน มจร';
+          remarks = `[มีข้อมูลการอบรม - ควรเสริมทักษะเฉพาะด้าน] บุคลากรบรรจุใหม่และวุฒิไม่ตรงสาย มีประวัติการอบรมแล้ว แต่ควรเสริมหลักสูตรเฉพาะทางตรงภาระงานเพิ่มเติม: "${recommendedCourse}"`;
+        }
+      } else if (hasSupplies && primaryDuties.length === 1) {
         riskLevel = 'ปกติ';
         riskScore = 1;
         recommendedCourse = 'หลักสูตรการบริหารสัญญา การควบคุมงานจ้าง และการจัดทำราคากลางงานก่อสร้างขั้นสูง (Advanced e-GP)';
-        remarks = `[สอดคล้องกับหน้าที่โดยตรง] บุคลากรผ่านการอบรมกฎหมายจัดซื้อจัดจ้างฯ มี Certificate กรมบัญชีกลาง มีความรู้ความสามารถตรงกับภาระงานพัสดุที่รับผิดชอบ ควรส่งเสริมต่อยอดทักษะด้าน "${recommendedCourse}" และพัฒนาเป็นพี่เลี้ยง (Mentor) ถ่ายทอดความรู้ภายในส่วนงาน`;
+        remarks = `[สอดคล้องกับหน้าที่โดยตรง - พัฒนาบุคลากรแล้ว] บุคลากรผ่านการอบรมกฎหมายจัดซื้อจัดจ้างฯ มีความรู้ความสามารถตรงกับภาระงานพัสดุที่รับผิดชอบ ช่วยลดความเสี่ยงข้อผิดพลาดในกระบวนการจัดซื้อจัดจ้าง ควรส่งเสริมต่อยอดทักษะด้าน "${recommendedCourse}" และพัฒนาเป็นพี่เลี้ยง (Mentor)`;
       } else if (hasSupplies && (hasFinance || hasAccounting)) {
-        riskLevel = 'สูง';
-        riskScore = 3;
+        riskLevel = hasInternalControlTraining ? 'ปานกลาง' : 'สูง';
+        riskScore = hasInternalControlTraining ? 2.3 : 3;
         recommendedCourse = 'หลักสูตรระบบการควบคุมภายในและการบริหารความเสี่ยงด้านการเงินการพัสดุสำหรับสถาบันอุดมศึกษา';
-        remarks = `[สอดคล้องบางส่วน - ควรระวัง SoD] มีความรู้ด้านพัสดุจาก Certificate แต่ปฏิบัติหน้าที่ควบงานการเงิน/บัญชี จึงมีความเสี่ยงด้านการควบคุมภายใน ควรต่อยอดทักษะด้าน "${recommendedCourse}" และเสนอให้ส่วนงานจัดแบ่งหน้าที่พัสดุและการเงินออกจากกัน`;
+        remarks = hasInternalControlTraining
+          ? `[ความเสี่ยงลดลง] มีความรู้ด้านพัสดุและการควบคุมภายใน ช่วยลดความเสี่ยงจากการปฏิบัติงานควบหน้าที่ แนะนำจัดแบ่งหน้าที่ให้ชัดเจนตามลำดับ`
+          : `[สอดคล้องบางส่วน - ควรระวัง SoD] มีความรู้ด้านพัสดุ แต่ปฏิบัติหน้าที่ควบงานการเงิน/บัญชี จึงมีความเสี่ยงด้านการควบคุมภายใน ควรต่อยอดทักษะด้าน "${recommendedCourse}" และเสนอให้ส่วนงานจัดแบ่งหน้าที่พัสดุและการเงินออกจากกัน`;
       } else {
-        riskLevel = 'ปานกลาง';
-        riskScore = 2;
+        riskLevel = 'ปกติ';
+        riskScore = 1.2;
         recommendedCourse = 'หลักสูตรมาตรฐานการบัญชีภาครัฐและการรายงานทางการเงินระบบ New GFMIS Thai';
-        remarks = `[สอดคล้องบางส่วน] มีพื้นฐานการอบรมพัสดุ แต่ควรเสริมองค์ความรู้ในภาระหน้าที่หลักด้านอื่นเพิ่มเติมอย่างต่อเนื่อง โดยเฉพาะ "${recommendedCourse}"`;
+        remarks = `[พัฒนาบุคลากรต่อเนื่อง - ความเสี่ยงต่ำ] บุคลากรได้รับการพัฒนาทักษะผ่านการอบรมเพิ่มเติม มีศักยภาพพร้อมปฏิบัติงานและช่วยลดความเสี่ยงในอนาคต ควรส่งเสริมต่อยอดความรู้ด้าน "${recommendedCourse}"`;
       }
     } else {
       // กรณี "ไม่มีข้อมูลการเข้ารับการอบรม": ประเมินความเสี่ยงและระบุหลักสูตรเร่งด่วน/จำเป็นพร้อมเหตุผล

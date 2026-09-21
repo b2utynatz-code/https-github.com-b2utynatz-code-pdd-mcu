@@ -252,9 +252,9 @@ export const PersonnelTableView: React.FC<PersonnelTableViewProps> = ({
                       {(() => {
                         const alignmentEval = evaluatePersonnelAlignment(person);
                         return (
-                          <div className="mt-0.5">
+                          <div className="mt-0.5 flex flex-col gap-1">
                             <span 
-                              className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium border ${
+                              className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium border w-fit ${
                                 alignmentEval.level === 'direct'
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                   : alignmentEval.level === 'related'
@@ -265,6 +265,14 @@ export const PersonnelTableView: React.FC<PersonnelTableViewProps> = ({
                             >
                               {alignmentEval.levelLabel}
                             </span>
+                            {person.trainings && person.trainings.length > 0 && (
+                              <span 
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-medium bg-pink-50 text-pink-700 border border-pink-200 w-fit"
+                                title={person.trainings.map(t => `${t.courseName} (${t.hours || 0} ชม.)`).join('\n')}
+                              >
+                                🎓 อบรม {person.trainings.length} คอร์ส
+                              </span>
+                            )}
                           </div>
                         );
                       })()}

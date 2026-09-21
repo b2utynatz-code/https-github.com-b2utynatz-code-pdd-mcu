@@ -20,7 +20,10 @@ import {
   Award,
   Trash2,
   BookOpen,
-  Layers
+  Layers,
+  Sparkles,
+  Plus,
+  FileCheck
 } from 'lucide-react';
 import { formatThaiDate, calculateTenure } from '../utils/helpers';
 import { evaluatePersonnelAlignment } from '../utils/educationAlignment';
@@ -46,6 +49,8 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
 
   const tenure = calculateTenure(person.startDate);
   const isMonk = person.gender === 'monk' || person.fullName.startsWith('พระ') || person.titlePrefix?.startsWith('พระ');
+  const trainings = person.trainings || [];
+  const totalTrainingHours = trainings.reduce((acc, t) => acc + (Number(t.hours) || 0), 0);
 
   const handleCopy = (text: string, type: 'line' | 'phone' | 'email') => {
     navigator.clipboard.writeText(text);
@@ -69,7 +74,7 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto animate-fadeIn">
       <div 
         id="personnel-detail-modal"
-        className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8"
+        className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8"
       >
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-pink-800 via-pink-700 to-rose-700 text-white p-5 flex items-start justify-between">
@@ -443,12 +448,118 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Section 4: ข้อสังเกตงานตรวจสอบภายใน (Audit Dossier Notes) */}
+          {/* Section 4: ข้อมูลการเข้ารับการอบรมและพัฒนาบุคลากร (Training & Risk Mitigation Portfolio) */}
+          <div>
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2 text-pink-900 font-semibold text-sm">
+                <Award className="w-4 h-4 text-pink-700" />
+                <span>หมวดที่ 4: ข้อมูลการเข้ารับการอบรมเพิ่มเติม (เพื่อพัฒนาบุคลากร และลดความเสี่ยงในอนาคต)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+                  {trainings.length} หลักสูตร
+                </span>
+                {totalTrainingHours > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                    รวม {totalTrainingHours} ชม.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* If certified procurement flag is active */}
+            {person.isCertifiedProcurement && (
+              <div className="mb-3 p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 flex items-center justify-between gap-3 text-xs text-emerald-900">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">ขึ้นทะเบียนผ่านการอบรม พ.ร.บ. จัดซื้อจัดจ้างฯ 2560 (Certificate กรมบัญชีกลาง)</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-medium shrink-0">
+                  รับรองแล้ว
+                </span>
+              </div>
+            )}
+
+            {trainings.length === 0 ? (
+              <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
+                <GraduationCap className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-medium text-slate-700">
+                  ยังไม่มีประวัติการเข้ารับการอบรมเพิ่มเติมในระบบ
+                </p>
+                <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                  ข้อแนะนำของผู้ตรวจสอบภายใน: ควรส่งเสริมให้บุคลากรเข้ารับการอบรมพัฒนาความรู้ในภาระหน้าที่หลัก เช่น กฎหมายการเงินพัสดุภาครัฐ เพื่อลดความเสี่ยงที่จะเกิดขึ้นในอนาคต
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onEdit(person);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-medium transition cursor-pointer shadow-xs mt-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>เพิ่มข้อมูลการอบรมตอนนี้</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trainings.map((t, idx) => (
+                  <div 
+                    key={t.id || idx}
+                    className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-pink-200 transition space-y-2"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="font-bold text-slate-900 text-xs">{t.courseName}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-pink-100 text-pink-800 border border-pink-200">
+                            {t.category}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                            t.status === 'มีวุฒิบัตร/ผ่านเกณฑ์' || t.status === 'ผ่านการอบรมแล้ว'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}>
+                            {t.status}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 font-body">
+                          <span>🏢 ผู้จัด: {t.organizer}</span>
+                          <span>📅 วันที่: {formatThaiDate(t.trainingDate)}</span>
+                          <span>⏱️ {t.hours} ชั่วโมง</span>
+                          {t.certificateNo && <span className="font-mono">📜 วุฒิบัตรเลขที่: {t.certificateNo}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Risk Mitigation Impact */}
+                    {t.riskMitigationImpact && (
+                      <div className="p-2.5 bg-white rounded-lg border border-emerald-200/90 text-[11px] text-slate-800 font-body flex items-start gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-emerald-900 block font-semibold">ผลลัพธ์ต่อการพัฒนาและลดความเสี่ยงในอนาคต:</strong>
+                          <p className="text-slate-700 mt-0.5">{t.riskMitigationImpact}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {t.notes && (
+                      <div className="text-[11px] text-slate-500 font-body italic pl-2 border-l-2 border-slate-300">
+                        หมายเหตุ: {t.notes}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 5: ข้อสังเกตงานตรวจสอบภายใน (Audit Dossier Notes) */}
           <div className="bg-pink-50/70 border border-pink-200 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-pink-900 font-semibold text-xs">
                 <ShieldCheck className="w-4 h-4 text-pink-700" />
-                <span>บันทึกและข้อสังเกตงานตรวจสอบภายใน (Internal Audit Assessment)</span>
+                <span>หมวดที่ 5: บันทึกและข้อสังเกตงานตรวจสอบภายใน (Internal Audit Assessment)</span>
               </div>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-pink-900 border border-pink-200">
                 สถานะ: {person.auditStatus || 'ปกติ'}

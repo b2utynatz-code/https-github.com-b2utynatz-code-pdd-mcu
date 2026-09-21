@@ -243,6 +243,21 @@ export const PersonnelCard: React.FC<PersonnelCardProps> = ({
           </div>
         </div>
 
+        {/* Training & Development Indicator */}
+        {person.trainings && person.trainings.length > 0 && (
+          <div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-pink-50/80 border border-pink-200 text-[11px] text-pink-950 font-body">
+            <div className="flex items-center gap-1.5 truncate">
+              <Award className="w-3.5 h-3.5 text-pink-700 shrink-0" />
+              <span className="truncate">
+                อบรมแล้ว <strong>{person.trainings.length} หลักสูตร</strong>
+              </span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded bg-white text-pink-800 font-semibold text-[10px] border border-pink-200 shrink-0">
+              {person.trainings.reduce((a, t) => a + (Number(t.hours) || 0), 0)} ชม.
+            </span>
+          </div>
+        )}
+
         {/* Contact Info (Items 8, 9, 10) */}
         <div className="space-y-1.5 text-xs font-body pt-1">
           {/* Phone */}

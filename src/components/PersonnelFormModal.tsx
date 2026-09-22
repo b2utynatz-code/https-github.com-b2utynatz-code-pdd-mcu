@@ -109,6 +109,13 @@ const SUGGESTED_COURSES: Array<{
     hours: 6,
     riskMitigationImpact: 'ลดข้อบกพร่องในการตรวจรับพัสดุงานวิจัย และเพิ่มความรัดกุมของเอกสารหลักฐานประกอบการเบิกจ่าย',
   },
+  {
+    courseName: 'การบริหารจัดการด้านการเงิน บัญชี และพัสดุภาครัฐแบบบูรณาการ สำหรับส่วนงานมหาวิทยาลัย',
+    organizer: 'สำนักงานตรวจสอบภายใน ร่วมกับ กองคลังและทรัพย์สิน มจร',
+    category: 'การเงิน บัญชี และพัสดุ',
+    hours: 18,
+    riskMitigationImpact: 'เสริมสร้างทักษะครบวงจรทั้ง 3 กลุ่มงาน (การเงิน บัญชี พัสดุ) รองรับการปฏิบัติงานส่วนงานที่มีบุคลากรจำกัดและลดข้อผิดพลาดข้ามสายงาน',
+  },
 ];
 
 const QUICK_RISK_MITIGATIONS = [
@@ -310,6 +317,7 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
 
     // Auto-check procurement certified if they took procurement course and passed
     const isProcurement = trainingForm.category === 'พัสดุ' || 
+      trainingForm.category === 'การเงิน บัญชี และพัสดุ' ||
       /พัสดุ|จัดซื้อ|e-gp|พ.ร.บ./i.test(trainingForm.courseName);
     const passed = trainingForm.status === 'ผ่านการอบรมแล้ว' || trainingForm.status === 'มีวุฒิบัตร/ผ่านเกณฑ์';
 
@@ -879,6 +887,7 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
                       <option value="การเงิน">การเงิน (Finance)</option>
                       <option value="บัญชี">บัญชี (Accounting)</option>
                       <option value="พัสดุ">พัสดุ (Procurement)</option>
+                      <option value="การเงิน บัญชี และพัสดุ">การเงิน บัญชี และพัสดุ (รวม 3 กลุ่มงาน)</option>
                       <option value="งบประมาณ">งบประมาณ (Budget)</option>
                       <option value="การควบคุมภายในและการบริหารความเสี่ยง">การควบคุมภายในและการบริหารความเสี่ยง</option>
                       <option value="ระบบสารสนเทศและดิจิทัล">ระบบสารสนเทศและดิจิทัล (e-GP, GFMIS)</option>

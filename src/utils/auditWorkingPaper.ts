@@ -89,11 +89,11 @@ export function generateWorkingPaperRows(personnelList: Personnel[]): WorkingPap
       /ควบคุมภายใน|ความเสี่ยง|sod|csa|ธรรมาภิบาล/i.test(t.courseName)
     );
     const hasFinanceAccountingTraining = personTrainings.some(t => 
-      t.category === 'การเงิน' || t.category === 'บัญชี' ||
+      t.category === 'การเงิน' || t.category === 'บัญชี' || t.category === 'การเงิน บัญชี และพัสดุ' ||
       /การเงิน|บัญชี|gfmis|งบการเงิน/i.test(t.courseName)
     );
     const hasProcurementTraining = hasCertified || personTrainings.some(t => 
-      t.category === 'พัสดุ' || 
+      t.category === 'พัสดุ' || t.category === 'การเงิน บัญชี และพัสดุ' ||
       /พัสดุ|จัดซื้อจัดจ้าง|e-gp|พ.ร.บ./i.test(t.courseName)
     );
 

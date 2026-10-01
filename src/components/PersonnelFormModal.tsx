@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Personnel, PrimaryDuty, EducationLevel, SubunitCategory, TrainingRecord } from '../types';
 import { 
   X, 
@@ -133,6 +133,7 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
   onSave,
   initialData,
 }) => {
+  const formContainerRef = useRef<HTMLFormElement>(null);
   const [formData, setFormData] = useState<Omit<Personnel, 'id'>>(DEFAULT_PERSONNEL);
   const [customDuty, setCustomDuty] = useState('');
   const [customCurriculum, setCustomCurriculum] = useState('');
@@ -154,6 +155,7 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
     notes: '',
   });
   const [trainingError, setTrainingError] = useState('');
+  const [trainingSuccessMsg, setTrainingSuccessMsg] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -164,7 +166,7 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
         curricula: initialData.curricula || [],
         academicLevels: initialData.academicLevels || ['ปริญญาตรี'],
         isMultiCurriculum: initialData.isMultiCurriculum ?? (initialData.curricula ? initialData.curricula.length > 1 : false),
-        trainings: initialData.trainings || [],
+        trainings: initialData.trainings ? [...initialData.trainings] : [],
       });
     } else {
       setFormData(DEFAULT_PERSONNEL);
@@ -172,19 +174,25 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
     setErrors({});
     setIsAddingTraining(false);
     setEditingTrainingId(null);
+    setTrainingSuccessMsg('');
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!formData.department.trim()) newErrors.department = 'กรุณาระบุส่วนงาน';
-    if (!formData.fullName.trim()) newErrors.fullName = 'กรุณาระบุชื่อ-นามสกุล';
-    if (!formData.position.trim()) newErrors.position = 'กรุณาระบุตำแหน่ง';
-    if (formData.primaryDuties.length === 0) newErrors.primaryDuties = 'กรุณาเลือกภาระหน้าที่หลักอย่างน้อย 1 ด้าน';
-    if (!formData.major.trim()) newErrors.major = 'กรุณาระบุสาขาวิชา';
-    if (!formData.startDate) newErrors.startDate = 'กรุณาระบุวันเริ่มปฏิบัติงาน';
-    if (!formData.phone.trim()) newErrors.phone = 'กรุณาระบุหมายเลขโทรศัพท์';
+    if (!(formData.department || '').trim()) {
+      newErrors.department = 'กรุณาระบุส่วนงานหลัก';
+    }
+    if (!(formData.fullName || '').trim()) {
+      newErrors.fullName = 'กรุณาระบุชื่อ-นามสกุล';
+    }
+    if (!(formData.position || '').trim()) {
+      newErrors.position = 'กรุณาระบุตำแหน่ง';
+    }
+    if (!formData.primaryDuties || formData.primaryDuties.length === 0) {
+      newErrors.primaryDuties = 'กรุณาเลือกภาระหน้าที่หลักอย่างน้อย 1 ด้าน';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -192,17 +200,56 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      formContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Auto-commit any in-progress training data if user was typing in the training subform
+    let finalTrainings = formData.trainings ? [...formData.trainings] : [];
+    let isCertified = Boolean(formData.isCertifiedProcurement);
+
+    if (isAddingTraining && (trainingForm.courseName || '').trim()) {
+      const isProcurement = trainingForm.category === 'พัสดุ' || 
+        trainingForm.category === 'การเงิน บัญชี และพัสดุ' ||
+        /พัสดุ|จัดซื้อ|e-gp|พ.ร.บ./i.test(trainingForm.courseName);
+      const passed = trainingForm.status === 'ผ่านการอบรมแล้ว' || trainingForm.status === 'มีวุฒิบัตร/ผ่านเกณฑ์';
+      if (isProcurement && passed) {
+        isCertified = true;
+      }
+
+      const recordId = editingTrainingId || trainingForm.id || `tr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const newRecord: TrainingRecord = { ...trainingForm, id: recordId };
+
+      if (editingTrainingId) {
+        finalTrainings = finalTrainings.map(t => t.id === editingTrainingId ? newRecord : t);
+      } else {
+        finalTrainings.push(newRecord);
+      }
+    }
 
     const curriculaCount = formData.curricula?.length || 0;
     const academicLevelsCount = formData.academicLevels?.length || 0;
     const isMulti = curriculaCount > 1 || academicLevelsCount > 1 || Boolean(formData.isMultiCurriculum);
 
+    const safeDepartment = (formData.department || formData.parentDepartment || '').trim() || 'ส่วนงาน มจร';
+    const safeFullName = (formData.fullName || '').trim();
+
     const personToSave: Personnel = {
+      ...DEFAULT_PERSONNEL,
       ...formData,
-      parentDepartment: formData.parentDepartment || formData.department,
+      department: safeDepartment,
+      parentDepartment: formData.parentDepartment || safeDepartment,
+      fullName: safeFullName,
+      position: (formData.position || '').trim() || 'นักวิชาการ',
+      primaryDuties: (formData.primaryDuties && formData.primaryDuties.length > 0) ? formData.primaryDuties : ['การเงิน'],
+      major: (formData.major || '').trim() || '-',
+      startDate: formData.startDate || new Date().toISOString().split('T')[0],
+      phone: (formData.phone || '').trim() || '-',
+      trainings: finalTrainings,
+      isCertifiedProcurement: isCertified,
       isMultiCurriculum: isMulti,
-      id: initialData ? initialData.id : `mcu-${Date.now()}`,
+      id: initialData ? initialData.id : ((formData as any).id || `mcu-${Date.now()}`),
     };
 
     onSave(personToSave);
@@ -308,11 +355,13 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
 
     const currentTrainings = formData.trainings || [];
     let updatedTrainings: TrainingRecord[];
+    const recordId = editingTrainingId || trainingForm.id || `tr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRecord: TrainingRecord = { ...trainingForm, id: recordId };
 
     if (editingTrainingId) {
-      updatedTrainings = currentTrainings.map(t => t.id === editingTrainingId ? trainingForm : t);
+      updatedTrainings = currentTrainings.map(t => t.id === editingTrainingId ? newRecord : t);
     } else {
-      updatedTrainings = [...currentTrainings, { ...trainingForm, id: trainingForm.id || `tr-${Date.now()}` }];
+      updatedTrainings = [...currentTrainings, newRecord];
     }
 
     // Auto-check procurement certified if they took procurement course and passed
@@ -330,6 +379,63 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
     setIsAddingTraining(false);
     setEditingTrainingId(null);
     setTrainingError('');
+    setTrainingSuccessMsg(`✓ บันทึกหลักสูตร "${newRecord.courseName}" ลงในรายการแล้ว (กดปุ่ม "บันทึกข้อมูล" ด้านล่างสุดเพื่อบันทึกลงระบบ)`);
+  };
+
+  const handleSaveTrainingAndSubmitAll = () => {
+    if (!trainingForm.courseName.trim()) {
+      setTrainingError('กรุณาระบุชื่อหลักสูตร / หัวข้อการอบรม');
+      return;
+    }
+
+    const safeDepartment = (formData.department || formData.parentDepartment || '').trim() || 'ส่วนงาน มจร';
+    const safeFullName = (formData.fullName || initialData?.fullName || '').trim();
+
+    if (!safeFullName) {
+      setErrors({ fullName: 'กรุณาระบุชื่อ-นามสกุลก่อนบันทึก' });
+      formContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const currentTrainings = formData.trainings ? [...formData.trainings] : [];
+    const recordId = editingTrainingId || trainingForm.id || `tr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRecord: TrainingRecord = { ...trainingForm, id: recordId };
+
+    let updatedTrainings: TrainingRecord[];
+    if (editingTrainingId) {
+      updatedTrainings = currentTrainings.map(t => t.id === editingTrainingId ? newRecord : t);
+    } else {
+      updatedTrainings = [...currentTrainings, newRecord];
+    }
+
+    const isProcurement = trainingForm.category === 'พัสดุ' || 
+      trainingForm.category === 'การเงิน บัญชี และพัสดุ' ||
+      /พัสดุ|จัดซื้อ|e-gp|พ.ร.บ./i.test(trainingForm.courseName);
+    const passed = trainingForm.status === 'ผ่านการอบรมแล้ว' || trainingForm.status === 'มีวุฒิบัตร/ผ่านเกณฑ์';
+
+    const curriculaCount = formData.curricula?.length || 0;
+    const academicLevelsCount = formData.academicLevels?.length || 0;
+    const isMulti = curriculaCount > 1 || academicLevelsCount > 1 || Boolean(formData.isMultiCurriculum);
+
+    const personToSave: Personnel = {
+      ...DEFAULT_PERSONNEL,
+      ...formData,
+      id: initialData ? initialData.id : ((formData as any).id || `mcu-${Date.now()}`),
+      department: safeDepartment,
+      parentDepartment: formData.parentDepartment || safeDepartment,
+      fullName: safeFullName,
+      position: (formData.position || '').trim() || 'นักวิชาการ',
+      primaryDuties: (formData.primaryDuties && formData.primaryDuties.length > 0) ? formData.primaryDuties : ['การเงิน'],
+      major: (formData.major || '').trim() || '-',
+      startDate: formData.startDate || new Date().toISOString().split('T')[0],
+      phone: (formData.phone || '').trim() || '-',
+      trainings: updatedTrainings,
+      isCertifiedProcurement: (isProcurement && passed) ? true : Boolean(formData.isCertifiedProcurement),
+      isMultiCurriculum: isMulti,
+    };
+
+    onSave(personToSave);
+    onClose();
   };
 
   const handleDeleteTrainingRecord = (id: string) => {
@@ -369,7 +475,17 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
         </div>
 
         {/* Form Body (Scrollable) */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form ref={formContainerRef} onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Top Error Alert Banner */}
+          {Object.keys(errors).length > 0 && (
+            <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-start gap-2.5 animate-fadeIn">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-rose-900">ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบข้อมูลที่จำเป็น:</p>
+                <p className="mt-0.5 text-rose-700">{Object.values(errors).join(' • ')}</p>
+              </div>
+            </div>
+          )}
           {/* Group 1: ข้อมูลทั่วไป (1-4) */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-1.5 border-b border-slate-200 text-pink-900 font-semibold text-sm">
@@ -997,26 +1113,59 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
                 </div>
 
                 {/* Sub-form Buttons */}
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingTraining(false);
-                      setEditingTrainingId(null);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveTrainingRecord}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{editingTrainingId ? 'บันทึกการแก้ไข' : 'บันทึกประวัติการอบรม'}</span>
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <span className="text-[11px] text-pink-700 font-medium">
+                    💡 ระบบจะบันทึกข้อมูลการอบรมนี้ทันทีเมื่อกดปุ่มบันทึก
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingTraining(false);
+                        setEditingTrainingId(null);
+                        setTrainingError('');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveTrainingRecord}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium transition cursor-pointer shadow-xs"
+                      title="บันทึกไว้ในรายการก่อน เพื่อเพิ่มหลักสูตรอื่นต่อ"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{editingTrainingId ? 'บันทึกการแก้ไข' : 'เพิ่มลงในรายการ'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveTrainingAndSubmitAll}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                      title="บันทึกหลักสูตรนี้และบันทึกข้อมูลบุคลากรลงระบบทันที"
+                    >
+                      <Save className="w-3.5 h-3.5 text-pink-200" />
+                      <span>บันทึกการอบรมและบันทึกข้อมูลทันที</span>
+                    </button>
+                  </div>
                 </div>
+              </div>
+            )}
+
+            {/* Success message banner when a training was added to list */}
+            {trainingSuccessMsg && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-lg text-xs text-emerald-800 flex items-center justify-between gap-2 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{trainingSuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTrainingSuccessMsg('')}
+                  className="text-emerald-700 hover:text-emerald-900 font-bold px-1.5 py-0.5"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
@@ -1146,22 +1295,38 @@ export const PersonnelFormModal: React.FC<PersonnelFormModalProps> = ({
         </form>
 
         {/* Form Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium transition cursor-pointer"
-          >
-            ยกเลิก
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>บันทึกข้อมูล</span>
-          </button>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div className="text-xs">
+            {Object.keys(errors).length > 0 && (
+              <span className="text-rose-600 flex items-center gap-1 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                กรุณากรอก: {Object.values(errors).join(', ')}
+              </span>
+            )}
+            {trainingSuccessMsg && Object.keys(errors).length === 0 && (
+              <span className="text-emerald-700 flex items-center gap-1 font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                {trainingSuccessMsg}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium transition cursor-pointer"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+            >
+              <Save className="w-4 h-4" />
+              <span>บันทึกข้อมูล</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

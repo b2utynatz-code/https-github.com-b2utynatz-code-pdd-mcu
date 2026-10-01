@@ -128,68 +128,75 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({
         </div>
 
         {/* Pie Chart Display */}
-        <div className="relative h-64 w-full flex items-center justify-center my-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsPie>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={4}
-                dataKey="value"
-                nameKey="name"
-                onClick={handleSliceClick}
-                cursor="pointer"
-                onMouseEnter={(_, index) => setActiveIndex(index)}
-                onMouseLeave={() => setActiveIndex(null)}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={entry.color} 
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={activeIndex === null || activeIndex === index ? 1 : 0.6}
-                  />
-                ))}
-              </Pie>
-              <Tooltip 
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const item = payload[0].payload;
-                    return (
-                      <div className="bg-slate-900 text-white text-xs p-2.5 rounded-xl shadow-lg border border-slate-700 space-y-1">
-                        <div className="font-bold text-pink-200">{item.name}</div>
-                        <div className="text-slate-200">
-                          • บุคลากร: <span className="font-semibold text-white">{item.personnelCount} คน</span> ({item.personnelPct}%)
-                        </div>
-                        <div className="text-slate-200">
-                          • ส่วนงานย่อย: <span className="font-semibold text-white">{item.deptCount} ส่วนงาน</span> ({item.deptPct}%)
-                        </div>
-                        <div className="text-[10px] text-pink-300 pt-0.5 border-t border-slate-700">
-                          คลิกเพื่อกรองดูรายชื่อ
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-            </RechartsPie>
-          </ResponsiveContainer>
-
-          {/* Center Indicator */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-            <span className="text-2xl font-extrabold text-slate-900 leading-none">
-              {totalValue}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-1 font-body">
-              {metricMode === 'personnel' ? 'บุคลากรทั้งหมด' : 'ส่วนงานทั้งหมด'}
-            </span>
+        {chartData.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs gap-2 border-2 border-dashed border-slate-100 rounded-xl my-2">
+            <PieChart className="w-10 h-10 text-slate-300 stroke-[1.5]" />
+            <p>ยังไม่มีข้อมูลสำหรับแสดงแผนภูมิ</p>
           </div>
-        </div>
+        ) : (
+          <div className="relative h-64 w-full flex items-center justify-center my-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPie>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={4}
+                  dataKey="value"
+                  nameKey="name"
+                  onClick={handleSliceClick}
+                  cursor="pointer"
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color} 
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                      opacity={activeIndex === null || activeIndex === index ? 1 : 0.6}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const item = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white text-xs p-2.5 rounded-xl shadow-lg border border-slate-700 space-y-1">
+                          <div className="font-bold text-pink-200">{item.name}</div>
+                          <div className="text-slate-200">
+                            • บุคลากร: <span className="font-semibold text-white">{item.personnelCount} คน</span> ({item.personnelPct}%)
+                          </div>
+                          <div className="text-slate-200">
+                            • ส่วนงานย่อย: <span className="font-semibold text-white">{item.deptCount} ส่วนงาน</span> ({item.deptPct}%)
+                          </div>
+                          <div className="text-[10px] text-pink-300 pt-0.5 border-t border-slate-700">
+                            คลิกเพื่อกรองดูรายชื่อ
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </RechartsPie>
+            </ResponsiveContainer>
+
+            {/* Center Indicator */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+              <span className="text-2xl font-extrabold text-slate-900 leading-none">
+                {totalValue}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-1 font-body">
+                {metricMode === 'personnel' ? 'บุคลากรทั้งหมด' : 'ส่วนงานทั้งหมด'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Breakdown Legend Items */}
         <div className="space-y-2 pt-1 font-body">

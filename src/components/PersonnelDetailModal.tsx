@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Personnel } from '../types';
+import { Personnel, TrainingRecord } from '../types';
 import { 
   X, 
   Building2, 
@@ -23,7 +23,10 @@ import {
   Layers,
   Sparkles,
   Plus,
-  FileCheck
+  FileCheck,
+  Save,
+  CheckCircle2,
+  Edit2
 } from 'lucide-react';
 import { formatThaiDate, calculateTenure } from '../utils/helpers';
 import { evaluatePersonnelAlignment } from '../utils/educationAlignment';
@@ -33,17 +36,68 @@ interface PersonnelDetailModalProps {
   onClose: () => void;
   onEdit: (person: Personnel) => void;
   onDelete?: (id: string) => void;
+  onUpdatePerson?: (person: Personnel) => void;
 }
+
+const DETAIL_SUGGESTED_COURSES = [
+  {
+    courseName: 'พระราชบัญญัติการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 และระบบ e-GP',
+    organizer: 'กรมบัญชีกลาง กระทรวงการคลัง',
+    category: 'พัสดุ' as const,
+    hours: 30,
+    riskMitigationImpact: 'เพิ่มความแม่นยำในการจัดทำร่าง TOR และการบริหารสัญญาพัสดุ ป้องกันข้อทักท้วงของ สตง. และถูกต้องตามกฎหมายกำหนด',
+  },
+  {
+    courseName: 'การบริหารจัดการด้านการเงิน บัญชี และพัสดุภาครัฐแบบบูรณาการ สำหรับส่วนงานมหาวิทยาลัย',
+    organizer: 'สำนักงานตรวจสอบภายใน ร่วมกับ กองคลังและทรัพย์สิน มจร',
+    category: 'การเงิน บัญชี และพัสดุ' as const,
+    hours: 18,
+    riskMitigationImpact: 'เสริมสร้างทักษะครบวงจรทั้ง 3 กลุ่มงาน (การเงิน บัญชี พัสดุ) รองรับการปฏิบัติงานส่วนงานที่มีบุคลากรจำกัดและลดข้อผิดพลาดข้ามสายงาน',
+  },
+  {
+    courseName: 'มาตรฐานการบัญชีภาครัฐและนโยบายการบัญชีภาครัฐ และระบบ New GFMIS Thai',
+    organizer: 'กรมบัญชีกลาง',
+    category: 'บัญชี' as const,
+    hours: 18,
+    riskMitigationImpact: 'ลดข้อผิดพลาดในการบันทึกบัญชีและการจัดทำรายงานการเงินรวมของมหาวิทยาลัย ป้องกันข้อสังเกตจากผู้ตรวจสอบ',
+  },
+  {
+    courseName: 'การประเมินการควบคุมด้วยตนเอง (Control Self-Assessment: CSA) และการบริหารความเสี่ยง',
+    organizer: 'สำนักงานตรวจสอบภายใน มหาวิทยาลัยมหาจุฬาลงกรณราชวิทยาลัย',
+    category: 'การควบคุมภายในและการบริหารความเสี่ยง' as const,
+    hours: 12,
+    riskMitigationImpact: 'ช่วยวางระบบการควบคุมภายในระดับส่วนงานและการแบ่งแยกหน้าที่ (SoD) ลดความเสี่ยงจากการปฏิบัติหน้าที่ควบซ้ำซ้อน',
+  },
+];
 
 export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
   person,
   onClose,
   onEdit,
   onDelete,
+  onUpdatePerson,
 }) => {
   const [copiedLine, setCopiedLine] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
+
+  // Inline Training Management State
+  const [isAddingInlineTraining, setIsAddingInlineTraining] = useState(false);
+  const [editingTrainingId, setEditingTrainingId] = useState<string | null>(null);
+  const [trainingForm, setTrainingForm] = useState<TrainingRecord>({
+    id: '',
+    courseName: '',
+    organizer: 'สำนักงานตรวจสอบภายใน มจร',
+    trainingDate: new Date().toISOString().split('T')[0],
+    hours: 12,
+    category: 'การเงิน บัญชี และพัสดุ',
+    riskMitigationImpact: 'ลดความเสี่ยงข้อผิดพลาดในการปฏิบัติงานและป้องกันข้อทักท้วงจากการตรวจสอบ',
+    status: 'ผ่านการอบรมแล้ว',
+    certificateNo: '',
+    notes: '',
+  });
+  const [trainingError, setTrainingError] = useState('');
+  const [successToast, setSuccessToast] = useState('');
 
   if (!person) return null;
 
@@ -64,6 +118,75 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
       setCopiedEmail(true);
       setTimeout(() => setCopiedEmail(false), 2000);
     }
+  };
+
+  const handleApplyCourseTemplate = (template: typeof DETAIL_SUGGESTED_COURSES[0]) => {
+    setTrainingForm(prev => ({
+      ...prev,
+      courseName: template.courseName,
+      organizer: template.organizer,
+      category: template.category,
+      hours: template.hours,
+      riskMitigationImpact: template.riskMitigationImpact,
+    }));
+  };
+
+  const handleSaveInlineTraining = () => {
+    if (!trainingForm.courseName.trim()) {
+      setTrainingError('กรุณาระบุชื่อหลักสูตร / หัวข้อการอบรม');
+      return;
+    }
+
+    const currentTrainings = person.trainings ? [...person.trainings] : [];
+    const recordId = editingTrainingId || trainingForm.id || `tr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRecord: TrainingRecord = { ...trainingForm, id: recordId };
+
+    let updatedTrainings: TrainingRecord[];
+    if (editingTrainingId) {
+      updatedTrainings = currentTrainings.map(t => t.id === editingTrainingId ? newRecord : t);
+    } else {
+      updatedTrainings = [...currentTrainings, newRecord];
+    }
+
+    const isProcurement = trainingForm.category === 'พัสดุ' || 
+      trainingForm.category === 'การเงิน บัญชี และพัสดุ' ||
+      /พัสดุ|จัดซื้อ|e-gp|พ.ร.บ./i.test(trainingForm.courseName);
+    const passed = trainingForm.status === 'ผ่านการอบรมแล้ว' || trainingForm.status === 'มีวุฒิบัตร/ผ่านเกณฑ์';
+
+    const updatedPerson: Personnel = {
+      ...person,
+      trainings: updatedTrainings,
+      isCertifiedProcurement: (isProcurement && passed) ? true : person.isCertifiedProcurement,
+    };
+
+    if (onUpdatePerson) {
+      onUpdatePerson(updatedPerson);
+    }
+
+    setIsAddingInlineTraining(false);
+    setEditingTrainingId(null);
+    setTrainingError('');
+    setSuccessToast(`✓ บันทึกข้อมูลการอบรม "${newRecord.courseName}" เรียบร้อยแล้ว`);
+    setTimeout(() => setSuccessToast(''), 4000);
+  };
+
+  const handleDeleteInlineTraining = (id: string, courseTitle: string) => {
+    if (!window.confirm(`ยืนยันการลบประวัติการอบรม "${courseTitle}" หรือไม่?`)) return;
+
+    const currentTrainings = person.trainings || [];
+    const updatedTrainings = currentTrainings.filter(t => t.id !== id);
+
+    const updatedPerson: Personnel = {
+      ...person,
+      trainings: updatedTrainings,
+    };
+
+    if (onUpdatePerson) {
+      onUpdatePerson(updatedPerson);
+    }
+
+    setSuccessToast('✓ ลบประวัติการอบรมเรียบร้อยแล้ว');
+    setTimeout(() => setSuccessToast(''), 3000);
   };
 
   const handlePrint = () => {
@@ -450,7 +573,7 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
 
           {/* Section 4: ข้อมูลการเข้ารับการอบรมและพัฒนาบุคลากร (Training & Risk Mitigation Portfolio) */}
           <div>
-            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200 flex-wrap gap-2">
               <div className="flex items-center gap-2 text-pink-900 font-semibold text-sm">
                 <Award className="w-4 h-4 text-pink-700" />
                 <span>หมวดที่ 4: ข้อมูลการเข้ารับการอบรมเพิ่มเติม (เพื่อพัฒนาบุคลากร และลดความเสี่ยงในอนาคต)</span>
@@ -464,8 +587,49 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
                     รวม {totalTrainingHours} ชม.
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingInlineTraining(true);
+                    setEditingTrainingId(null);
+                    setTrainingForm({
+                      id: '',
+                      courseName: '',
+                      organizer: 'สำนักงานตรวจสอบภายใน มจร',
+                      trainingDate: new Date().toISOString().split('T')[0],
+                      hours: 12,
+                      category: 'การเงิน บัญชี และพัสดุ',
+                      riskMitigationImpact: 'ลดความเสี่ยงข้อผิดพลาดในการปฏิบัติงานและป้องกันข้อทักท้วงจากการตรวจสอบ',
+                      status: 'ผ่านการอบรมแล้ว',
+                      certificateNo: '',
+                      notes: '',
+                    });
+                    setTrainingError('');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>เพิ่มการอบรม</span>
+                </button>
               </div>
             </div>
+
+            {/* Success Toast Banner */}
+            {successToast && (
+              <div className="mb-3 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 flex items-center justify-between gap-2 animate-fadeIn">
+                <div className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{successToast}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSuccessToast('')}
+                  className="text-emerald-700 hover:text-emerald-950 font-bold px-1.5"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* If certified procurement flag is active */}
             {person.isCertifiedProcurement && (
@@ -477,6 +641,209 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
                 <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-medium shrink-0">
                   รับรองแล้ว
                 </span>
+              </div>
+            )}
+
+            {/* Inline Training Add/Edit Form */}
+            {isAddingInlineTraining && (
+              <div className="mb-4 p-4 bg-pink-50/70 rounded-xl border-2 border-pink-300 shadow-sm space-y-3.5 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-pink-200 pb-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-pink-900">
+                    <Sparkles className="w-4 h-4 text-pink-600" />
+                    <span>{editingTrainingId ? 'แก้ไขข้อมูลการอบรม' : 'เพิ่มประวัติการเข้ารับการอบรมใหม่'}</span>
+                  </div>
+                  <span className="text-[11px] text-pink-700 bg-pink-100/70 px-2 py-0.5 rounded">
+                    บันทึกแล้วระบบจะจัดเก็บลงฐานข้อมูลทันที
+                  </span>
+                </div>
+
+                {/* Course Templates */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                    ⚡ เลือกหลักสูตรแนะนำตามเกณฑ์ผู้ตรวจสอบภายใน (คลิกเพื่อเลือกทันที):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {DETAIL_SUGGESTED_COURSES.map((tpl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleApplyCourseTemplate(tpl)}
+                        className="text-left p-2 rounded-lg bg-white hover:bg-pink-100/80 border border-pink-200 hover:border-pink-300 transition text-[11px] cursor-pointer group"
+                      >
+                        <div className="font-semibold text-slate-800 group-hover:text-pink-900 line-clamp-1">
+                          {tpl.courseName}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+                          <span className="px-1.5 py-0.2 rounded bg-pink-50 text-pink-700 border border-pink-100">
+                            {tpl.category}
+                          </span>
+                          <span>⏱️ {tpl.hours} ชม.</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {trainingError && (
+                  <div className="p-2 bg-rose-50 border border-rose-300 rounded text-xs text-rose-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{trainingError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="sm:col-span-2">
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      ชื่อหลักสูตร / หัวข้อการอบรม <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={trainingForm.courseName}
+                      onChange={e => setTrainingForm({ ...trainingForm, courseName: e.target.value })}
+                      placeholder="เช่น พระราชบัญญัติการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      หมวดหมู่ / ด้านภาระงาน <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={trainingForm.category}
+                      onChange={e => setTrainingForm({ ...trainingForm, category: e.target.value as any })}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    >
+                      <option value="การเงิน บัญชี และพัสดุ">การเงิน บัญชี และพัสดุ (อบรมรวม 3 ด้าน)</option>
+                      <option value="การเงิน">การเงิน</option>
+                      <option value="บัญชี">บัญชี</option>
+                      <option value="พัสดุ">พัสดุ (จัดซื้อจัดจ้าง)</option>
+                      <option value="นโยบายและแผน">นโยบายและแผน</option>
+                      <option value="เทคโนโลยีสารสนเทศ">เทคโนโลยีสารสนเทศ</option>
+                      <option value="การควบคุมภายในและการบริหารความเสี่ยง">การควบคุมภายในและการบริหารความเสี่ยง</option>
+                      <option value="กฎหมายและระเบียบภาครัฐ">กฎหมายและระเบียบภาครัฐ</option>
+                      <option value="การพัฒนาทักษะวิชาชีพ">การพัฒนาทักษะวิชาชีพ</option>
+                      <option value="การบริหารและการจัดการ">การบริหารและการจัดการ</option>
+                      <option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      หน่วยงานผู้จัดฝึกอบรม
+                    </label>
+                    <input
+                      type="text"
+                      value={trainingForm.organizer}
+                      onChange={e => setTrainingForm({ ...trainingForm, organizer: e.target.value })}
+                      placeholder="เช่น กรมบัญชีกลาง, กองคลัง มจร"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      วันที่เข้ารับการอบรม
+                    </label>
+                    <input
+                      type="date"
+                      value={trainingForm.trainingDate}
+                      onChange={e => setTrainingForm({ ...trainingForm, trainingDate: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-semibold text-slate-800 mb-1">
+                        จำนวนชั่วโมง
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={trainingForm.hours}
+                        onChange={e => setTrainingForm({ ...trainingForm, hours: Number(e.target.value) || 0 })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-800 mb-1">
+                        สถานะการประเมิน
+                      </label>
+                      <select
+                        value={trainingForm.status}
+                        onChange={e => setTrainingForm({ ...trainingForm, status: e.target.value as any })}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                      >
+                        <option value="มีวุฒิบัตร/ผ่านเกณฑ์">มีวุฒิบัตร/ผ่านเกณฑ์</option>
+                        <option value="ผ่านการอบรมแล้ว">ผ่านการอบรมแล้ว</option>
+                        <option value="อยู่ระหว่างการอบรม">อยู่ระหว่างการอบรม</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      ผลลัพธ์ต่อการพัฒนาและลดความเสี่ยงในอนาคต (Internal Audit Compensating Control)
+                    </label>
+                    <input
+                      type="text"
+                      value={trainingForm.riskMitigationImpact || ''}
+                      onChange={e => setTrainingForm({ ...trainingForm, riskMitigationImpact: e.target.value })}
+                      placeholder="เช่น เพิ่มทักษะการตรวจรับพัสดุและลดความเสี่ยงข้อผิดพลาดจากภาระงานควบซ้ำซ้อน"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      เลขที่วุฒิบัตร / หนังสือรับรอง (ถ้ามี)
+                    </label>
+                    <input
+                      type="text"
+                      value={trainingForm.certificateNo || ''}
+                      onChange={e => setTrainingForm({ ...trainingForm, certificateNo: e.target.value })}
+                      placeholder="เช่น วศ. 67/089"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1">
+                      หมายเหตุเพิ่มเติม
+                    </label>
+                    <input
+                      type="text"
+                      value={trainingForm.notes || ''}
+                      onChange={e => setTrainingForm({ ...trainingForm, notes: e.target.value })}
+                      placeholder="เช่น ข้อมูลผ่านการรับรองจากกองบริหารงานบุคคล"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Sub-form Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-pink-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingInlineTraining(false);
+                      setEditingTrainingId(null);
+                      setTrainingError('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveInlineTraining}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-pink-200" />
+                    <span>{editingTrainingId ? 'บันทึกการแก้ไขการอบรม' : 'บันทึกข้อมูลการอบรม'}</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -492,8 +859,20 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    onClose();
-                    onEdit(person);
+                    setIsAddingInlineTraining(true);
+                    setEditingTrainingId(null);
+                    setTrainingForm({
+                      id: '',
+                      courseName: '',
+                      organizer: 'สำนักงานตรวจสอบภายใน มจร',
+                      trainingDate: new Date().toISOString().split('T')[0],
+                      hours: 12,
+                      category: 'การเงิน บัญชี และพัสดุ',
+                      riskMitigationImpact: 'ลดความเสี่ยงข้อผิดพลาดในการปฏิบัติงานและป้องกันข้อทักท้วงจากการตรวจสอบ',
+                      status: 'ผ่านการอบรมแล้ว',
+                      certificateNo: '',
+                      notes: '',
+                    });
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-xs font-medium transition cursor-pointer shadow-xs mt-1"
                 >
@@ -509,7 +888,7 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
                     className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-pink-200 transition space-y-2"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                      <div>
+                      <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-1.5 mb-1">
                           <span className="font-bold text-slate-900 text-xs">{t.courseName}</span>
                           <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-pink-100 text-pink-800 border border-pink-200">
@@ -529,6 +908,30 @@ export const PersonnelDetailModal: React.FC<PersonnelDetailModalProps> = ({
                           <span>⏱️ {t.hours} ชั่วโมง</span>
                           {t.certificateNo && <span className="font-mono">📜 วุฒิบัตรเลขที่: {t.certificateNo}</span>}
                         </div>
+                      </div>
+
+                      {/* Training Action Buttons */}
+                      <div className="flex items-center gap-1.5 self-end sm:self-start shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrainingForm({ ...t });
+                            setEditingTrainingId(t.id);
+                            setIsAddingInlineTraining(true);
+                          }}
+                          className="p-1 rounded text-slate-500 hover:text-pink-700 hover:bg-pink-100 transition cursor-pointer"
+                          title="แก้ไขการอบรมนี้"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteInlineTraining(t.id, t.courseName)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          title="ลบการอบรมนี้"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 

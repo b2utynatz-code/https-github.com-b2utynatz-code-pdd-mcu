@@ -21,7 +21,7 @@ import { calculateTenure } from './utils/helpers';
 import { evaluatePersonnelAlignment } from './utils/educationAlignment';
 import { Users, AlertCircle, Plus, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, Upload } from 'lucide-react';
 
-const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v3';
+const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v5';
 const AUTH_STORAGE_KEY = 'mcu_audit_current_user_v1';
 
 export default function App() {
@@ -39,9 +39,14 @@ export default function App() {
     return null;
   });
 
-  // Load the newly processed survey dataset (191 records from MCU survey 2569)
+  // Personnel dataset state: updated with the complete survey dataset from the user's uploaded CSV (208 records)
   const [personnelList, setPersonnelList] = useState<Personnel[]>(() => {
     try {
+      // Remove older cached versions to ensure full sync with latest uploaded data
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v4');
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v3');
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v2');
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v1');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved !== null) {
         const parsed = JSON.parse(saved);
@@ -52,7 +57,7 @@ export default function App() {
     } catch {
       // Fallback
     }
-    // Default to the processed real survey dataset
+    // Default to the newly updated survey dataset from uploaded CSV
     return REAL_SURVEY_PERSONNEL;
   });
 
@@ -232,13 +237,33 @@ export default function App() {
 
   // Handlers for CRUD operations
   const handleSavePersonnel = (person: Personnel) => {
-    const exists = personnelList.some(p => p.id === person.id);
-    if (exists) {
-      setPersonnelList(prev => prev.map(p => (p.id === person.id ? person : p)));
-      showToast(`บันทึกการแก้ไขข้อมูล "${person.fullName}" เรียบร้อยแล้ว`);
+    const validPerson: Personnel = {
+      ...person,
+      id: person.id || `mcu-${Date.now()}`,
+      trainings: Array.isArray(person.trainings) ? person.trainings : [],
+    };
+
+    const isExisting = personnelList.some(p => p.id === validPerson.id);
+
+    setPersonnelList(prev => {
+      const exists = prev.some(p => p.id === validPerson.id);
+      const updatedList = exists
+        ? prev.map(p => (p.id === validPerson.id ? validPerson : p))
+        : [validPerson, ...prev];
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+      } catch (e) {
+        console.error('Failed to save to localStorage:', e);
+      }
+
+      return updatedList;
+    });
+
+    if (isExisting) {
+      showToast(`บันทึกการแก้ไขข้อมูล "${validPerson.fullName}" เรียบร้อยแล้ว`);
     } else {
-      setPersonnelList(prev => [person, ...prev]);
-      showToast(`เพิ่มข้อมูล "${person.fullName}" เข้าสู่ระบบเรียบร้อยแล้ว`);
+      showToast(`เพิ่มข้อมูล "${validPerson.fullName}" เข้าสู่ระบบเรียบร้อยแล้ว`);
     }
   };
 
@@ -266,7 +291,22 @@ export default function App() {
 
   const handleResetToDefault = () => {
     setPersonnelList(REAL_SURVEY_PERSONNEL);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(REAL_SURVEY_PERSONNEL));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
     showToast(`โหลดชุดข้อมูลสำรวจจริงจากไฟล์ CSV สำเร็จ (${REAL_SURVEY_PERSONNEL.length} ท่าน)`);
+  };
+
+  const executeClearAllData = () => {
+    setPersonnelList([]);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    } catch (e) {
+      console.error('Failed to clear localStorage:', e);
+    }
+    showToast('ล้างข้อมูลเรียบร้อยแล้ว ระบบว่างเปล่าพร้อมสำหรับการนำเข้าไฟล์ CSV ใหม่');
   };
 
   const handleClearAllPersonnel = () => {
@@ -660,6 +700,10 @@ export default function App() {
           setSelectedPersonForDetail(null);
           handleDeletePersonnel(id);
         }}
+        onUpdatePerson={(updatedPerson) => {
+          handleSavePersonnel(updatedPerson);
+          setSelectedPersonForDetail(updatedPerson);
+        }}
       />
 
       <PersonnelFormModal
@@ -682,7 +726,7 @@ export default function App() {
         personnelList={personnelList}
         onImportPersonnel={handleImportPersonnel}
         onResetToDefault={handleResetToDefault}
-        onClearAllData={handleClearAllPersonnel}
+        onClearAllData={executeClearAllData}
       />
 
       {/* Modal displaying complete dataset of personnel handling 3+ duties */}
@@ -758,9 +802,8 @@ export default function App() {
         cancelLabel="ยกเลิก"
         isDestructive={true}
         onConfirm={() => {
-          setPersonnelList([]);
+          executeClearAllData();
           setIsConfirmClearAllOpen(false);
-          showToast('ล้างข้อมูลเรียบร้อยแล้ว ท่านสามารถเริ่มใส่ข้อมูลใหม่หรือแนบไฟล์ CSV ได้ทันที');
         }}
         onClose={() => setIsConfirmClearAllOpen(false)}
       />

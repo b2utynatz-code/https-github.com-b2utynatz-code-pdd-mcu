@@ -30,8 +30,8 @@ function getTitleAndGender(fullName) {
   if (clean.startsWith('นาง')) return { titlePrefix: 'นาง', gender: 'female' };
   if (clean.startsWith('ว่าที่ ร.ต.หญิง') || clean.startsWith('ว่าที่ร้อยตรีหญิง')) return { titlePrefix: 'ว่าที่ ร.ต.หญิง', gender: 'female' };
   if (clean.startsWith('นาย')) return { titlePrefix: 'นาย', gender: 'male' };
-  if (clean.startsWith('ดร.') || clean.startsWith('ผศ.ดร.')) {
-    titlePrefix = clean.startsWith('ผศ.ดร.') ? 'ผศ.ดร.' : 'ดร.';
+  if (clean.startsWith('ดร.') || clean.startsWith('ผศ.ดร.') || clean.startsWith('รศ.ดร.')) {
+    titlePrefix = clean.startsWith('ผศ.ดร.') ? 'ผศ.ดร.' : clean.startsWith('รศ.ดร.') ? 'รศ.ดร.' : 'ดร.';
     if (clean.includes('ศิริประภา') || clean.includes('วารี') || clean.includes('มณฑกานต์') || clean.includes('กรรณิการ์') || clean.includes('สุพิชฌาย์')) {
       gender = 'female';
     } else {
@@ -45,8 +45,11 @@ function getTitleAndGender(fullName) {
 
 // Convert Date to ISO YYYY-MM-DD
 function parseThaiDate(dateStr) {
-  if (!dateStr || !dateStr.trim()) return '2019-10-01';
+  if (!dateStr || !dateStr.trim()) return '2020-01-01';
   let s = normalizeThaiDigits(dateStr.trim());
+
+  // Replace typo ๒๙๖๙ -> 2569
+  s = s.replace(/2969/g, '2569');
 
   const thaiMonths = {
     'มกราคม': '01', 'กุมภาพันธ์': '02', 'มีนาคม': '03', 'เมษายน': '04',
@@ -57,14 +60,21 @@ function parseThaiDate(dateStr) {
   for (const [mName, mNum] of Object.entries(thaiMonths)) {
     if (s.includes(mName)) {
       const parts = s.split(/\s+/).filter(Boolean);
-      const day = parts[0]?.padStart(2, '0') || '01';
-      let year = parseInt(parts[2] || '2560', 10);
+      let day = '01';
+      // Find day
+      const dayMatch = s.match(/(\d{1,2})\s*(-|\s)\s*(\d{1,2})?\s*/);
+      if (dayMatch) {
+        day = (dayMatch[3] || dayMatch[1]).padStart(2, '0');
+      }
+      let year = 2569;
+      const yrMatch = s.match(/25\d{2}/);
+      if (yrMatch) year = parseInt(yrMatch[0], 10);
       if (year > 2400) year -= 543;
       return `${year}-${mNum}-${day}`;
     }
   }
 
-  // formats like 10/5/2548 or 1/12/2016
+  // formats like 10/5/2548 or 1/12/2016 or 1/106/2554 (typo)
   const parts = s.split(/[\/\-\.]/);
   if (parts.length >= 3) {
     let day = parts[0].trim().padStart(2, '0');
@@ -110,7 +120,7 @@ function analyzeDuties(dutyText, positionText) {
   const primaryDuties = [];
   const duties = [];
 
-  const hasFinance = t.includes('การเงิน') || t.includes('เงินรับ') || t.includes('เงินจ่าย') || t.includes('คลัง') || t.includes('คุมเงิน') || t.includes('สดย่อย') || t.includes('เช็ค') || t.includes('รับ-จ่ายเงิน');
+  const hasFinance = t.includes('การเงิน') || t.includes('เงินรับ') || t.includes('เงินจ่าย') || t.includes('คลัง') || t.includes('คุมเงิน') || t.includes('สดย่อย') || t.includes('เช็ค') || t.includes('รับ-จ่ายเงิน') || t.includes('การเงินรับ') || t.includes('การเงินจ่าย');
   const hasAccount = t.includes('บัญชี') || t.includes('ปิดบัญชี') || t.includes('ลงรายวัน') || t.includes('บันทึกบัญชี');
   const hasParcel = t.includes('พัสดุ') || t.includes('จัดซื้อ') || t.includes('ตรวจรับ');
   const hasBudget = t.includes('งบประมาณ') || t.includes('แผน') || t.includes('นโยบาย') || t.includes('แผนปฏิบัติการ');
@@ -143,6 +153,52 @@ function standardizeEducationLevel(levelStr, majorStr) {
   if (str.includes('ปวส') || str.includes('ประกาศนียบัตรวิชาชีพชั้นสูง')) return 'ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)';
   if (str.includes('ตรี') || str.includes('บัณฑิต') || str.includes('B.A.') || str.includes('บช.บ.') || str.includes('บธ.บ.') || str.includes('ทล.บ.') || str.includes('ศศ.บ.') || str.includes('ร.บ.') || str.includes('รป.บ.') || str.includes('วท.บ.')) return 'ปริญญาตรี';
   return 'ปริญญาตรี';
+}
+
+// Extract trainings from columns 11-19
+function extractTrainingsFromCols(cols, personId) {
+  const trainings = [];
+  const slots = [
+    { nameIdx: 11, dateIdx: 12, certIdx: 13 },
+    { nameIdx: 14, dateIdx: 15, certIdx: 16 },
+    { nameIdx: 17, dateIdx: 18, certIdx: 19 },
+  ];
+
+  slots.forEach((slot, sIdx) => {
+    const rawCourse = cols[slot.nameIdx]?.trim();
+    if (rawCourse && rawCourse.length > 2) {
+      const rawDate = cols[slot.dateIdx]?.trim();
+      const trainingDate = rawDate ? parseThaiDate(rawDate) : '2026-03-27';
+      const cLower = rawCourse.toLowerCase();
+      let category = 'การเงิน บัญชี และพัสดุ';
+      if (cLower.includes('พัสดุ') && (cLower.includes('บัญชี') || cLower.includes('การเงิน'))) {
+        category = 'การเงิน บัญชี และพัสดุ';
+      } else if (cLower.includes('พัสดุ') || cLower.includes('จัดซื้อ')) {
+        category = 'พัสดุ';
+      } else if (cLower.includes('บัญชี')) {
+        category = 'บัญชี';
+      } else if (cLower.includes('การเงิน') || cLower.includes('เงิน')) {
+        category = 'การเงิน';
+      } else if (cLower.includes('งบประมาณ') || cLower.includes('แผน')) {
+        category = 'งบประมาณ';
+      } else if (cLower.includes('กฎหมาย') || cLower.includes('ควบคุมภายใน')) {
+        category = 'การควบคุมภายในและการบริหารความเสี่ยง';
+      }
+
+      trainings.push({
+        id: `tr-${personId}-${sIdx + 1}`,
+        courseName: rawCourse,
+        organizer: 'สำนักงานตรวจสอบภายใน มจร',
+        trainingDate,
+        hours: 6,
+        category,
+        riskMitigationImpact: 'เสริมสร้างศักยภาพและความรู้ความเข้าใจเพื่อลดความเสี่ยงในการปฏิบัติงาน',
+        status: 'มีวุฒิบัตร/ผ่านเกณฑ์',
+      });
+    }
+  });
+
+  return trainings;
 }
 
 function run() {
@@ -211,7 +267,7 @@ function run() {
     }
 
     // Check if col2 has a person name (not empty, doesn't look like a curriculum header)
-    if (!col2 || col2.startsWith('ระดับ') || col2.startsWith('หลักสูตร') || col2.startsWith('พธ.ม.') || col2.startsWith('พธ.ด.') || col2.startsWith('ค.บ.') || col2.startsWith('ค.ม.')) {
+    if (!col2 || col2.startsWith('ระดับ') || col2.startsWith('หลักสูตร') || col2.startsWith('พธ.ม.') || col2.startsWith('พธ.ด.') || col2.startsWith('ค.บ.') || col2.startsWith('ค.ม.') || col2.startsWith('(ไม่มี)')) {
       if (col1 && (col1.startsWith('หลักสูตร') || col1.startsWith('ค.บ.') || col1.startsWith('ค.ม.') || col1.startsWith('พธ.ม.') || col1.startsWith('พธ.ด.') || col1.startsWith('B.A.') || col1.startsWith('M.A.') || col1.startsWith('Ph.D.'))) {
         currentCurriculum = col1;
       }
@@ -235,7 +291,8 @@ function run() {
       startDateStr: col7 || '',
       email: col8 || '',
       lineId: col9 || '',
-      phone: col10 || ''
+      phone: col10 || '',
+      cols // store raw cols for trainings extraction
     });
   }
 
@@ -260,6 +317,8 @@ function run() {
       else if (rec.curriculum.includes('ประกาศนียบัตร') || rec.curriculum.includes('ป.บัณฑิต') || rec.curriculum.includes('ป.อค.') || rec.curriculum.includes('ป.ทศ.')) academicLevel = 'ประกาศนียบัตร / ป.บัณฑิต';
     }
 
+    const trainings = extractTrainingsFromCols(rec.cols, `p${idx + 1}`);
+
     if (!existing) {
       personMap.set(key, {
         id: `p-${String(idx + 1).padStart(3, '0')}`,
@@ -282,7 +341,8 @@ function run() {
         curricula: rec.curriculum ? [rec.curriculum] : [],
         academicLevels: academicLevel ? [academicLevel] : [],
         gender,
-        isCertifiedProcurement: primaryDuties.includes('พัสดุ'),
+        trainings,
+        isCertifiedProcurement: primaryDuties.includes('พัสดุ') || trainings.some(t => t.category === 'พัสดุ' || t.courseName.includes('พัสดุ')),
       });
     } else {
       // Merge curricula
@@ -299,6 +359,15 @@ function run() {
       duties.forEach(d => {
         if (!existing.duties.includes(d)) existing.duties.push(d);
       });
+      // Merge trainings
+      trainings.forEach(tr => {
+        if (!existing.trainings.some(et => et.courseName === tr.courseName)) {
+          existing.trainings.push(tr);
+        }
+      });
+      if (trainings.some(t => t.category === 'พัสดุ' || t.courseName.includes('พัสดุ'))) {
+        existing.isCertifiedProcurement = true;
+      }
       // Prefer non-empty contact info
       if (!existing.email && rec.email) existing.email = rec.email;
       if ((!existing.phone || existing.phone === '-') && rec.phone) existing.phone = normalizeThaiDigits(rec.phone);

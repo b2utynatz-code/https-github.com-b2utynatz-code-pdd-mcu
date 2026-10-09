@@ -16,6 +16,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { AuthUser } from '../types';
+import { REAL_SURVEY_PERSONNEL } from '../data/surveyData';
 
 interface HeaderProps {
   currentUser?: AuthUser | null;
@@ -192,10 +193,10 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={onReloadSurveyData}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-pink-700 hover:bg-pink-800 text-white text-sm font-medium transition cursor-pointer shadow-xs"
-                title="โหลดชุดข้อมูลสำรวจบุคลากร มจร ประจำปี 2569 (191 ท่าน)"
+                title={`โหลดชุดข้อมูลสำรวจบุคลากร มจร ประจำปี 2569 (${REAL_SURVEY_PERSONNEL.length} ท่าน)`}
               >
                 <RotateCcw className="w-4 h-4 text-white" />
-                <span>โหลดข้อมูลสำรวจ มจร (191 ท่าน)</span>
+                <span>โหลดข้อมูลสำรวจ มจร ({REAL_SURVEY_PERSONNEL.length} ท่าน)</span>
               </button>
             )}
 

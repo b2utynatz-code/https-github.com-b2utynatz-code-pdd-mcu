@@ -21,7 +21,7 @@ import { calculateTenure } from './utils/helpers';
 import { evaluatePersonnelAlignment } from './utils/educationAlignment';
 import { Users, AlertCircle, Plus, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, Upload } from 'lucide-react';
 
-const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v5';
+const STORAGE_KEY = 'mcu_audit_personnel_dataset_2569_v7';
 const AUTH_STORAGE_KEY = 'mcu_audit_current_user_v1';
 
 export default function App() {
@@ -39,10 +39,12 @@ export default function App() {
     return null;
   });
 
-  // Personnel dataset state: updated with the complete survey dataset from the user's uploaded CSV (208 records)
+  // Personnel dataset state: loaded with the newly processed survey dataset (219 records)
   const [personnelList, setPersonnelList] = useState<Personnel[]>(() => {
     try {
-      // Remove older cached versions to ensure full sync with latest uploaded data
+      // Remove older cached versions to ensure complete purge of previous datasets
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v6');
+      localStorage.removeItem('mcu_audit_personnel_dataset_2569_v5');
       localStorage.removeItem('mcu_audit_personnel_dataset_2569_v4');
       localStorage.removeItem('mcu_audit_personnel_dataset_2569_v3');
       localStorage.removeItem('mcu_audit_personnel_dataset_2569_v2');
@@ -57,7 +59,7 @@ export default function App() {
     } catch {
       // Fallback
     }
-    // Default to the newly updated survey dataset from uploaded CSV
+    // Default to the newly processed complete survey dataset (219 records)
     return REAL_SURVEY_PERSONNEL;
   });
 
